@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"chivomap.com/config"
-	"chivomap.com/routes"
+	"chivomap.com/handlers"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -15,8 +15,7 @@ func main() {
 	// Conectar a la base de datos
 	config.ConnectDB()
 
-	// Registrar rutas
-	routes.SetupRoutes(app)
+	handlers.SetupRoutes(app)
 
 	log.Println("🚀 Servidor corriendo en http://localhost:8080")
 	log.Fatal(app.Listen(":8080"))
