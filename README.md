@@ -44,3 +44,14 @@ Disponible en: `http://localhost:8080`
 go mod tidy  # Instalar dependencias
 export $(grep -v '^#' .env | xargs) && go run main.go  # Cargar .env y ejecutar
 ```
+
+## License
+This project is licensed under the MIT License with additional terms - see LICENSE.md
+
+## Intellectual Property Notice
+Copyright © 2024 ChivoMap. All rights reserved.
+While this project is open-source, the following restrictions apply:
+
+- The ChivoMap name and logo are trademarks and may not be used without permission
+- Commercial use requires explicit written permission
+- Derivative works must maintain all copyright and license notices
