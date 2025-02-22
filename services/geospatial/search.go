@@ -9,52 +9,71 @@ import (
 	geojson "github.com/paulmach/go.geojson"
 )
 
+// TopoJSON representa la estructura de un archivo TopoJSON.
 type TopoJSON struct {
 	Type    string                `json:"type"`
 	Objects map[string]TopoObject `json:"objects"`
 	Arcs    [][][]float64         `json:"arcs"`
 }
 
+// TopoObject representa un objeto TopoJSON con geometrías.
 type TopoObject struct {
 	Type       string     `json:"type"`
 	Geometries []Geometry `json:"geometries"`
 }
 
+// Geometry representa la geometría de un objeto TopoJSON.
 type Geometry struct {
-	Type       string            `json:"type"`
+	Type string `json:"type"`
+	// Se asume que cada referencia de arco es un slice con un único entero.
 	Arcs       [][][]int         `json:"arcs"`
 	Properties map[string]string `json:"properties"`
 }
 
+// GeoData contiene la información agrupada de departamentos, municipios y distritos.
 type GeoData struct {
 	Departamentos []string
 	Municipios    []string
 	Distritos     []string
 }
 
-func convertToGeoJSON(topo *TopoJSON) *geojson.FeatureCollection {
-	features := make([]*geojson.Feature, 0)
+// reverseCoordinates invierte el orden de las coordenadas en un slice.
+func reverseCoordinates(coords [][]float64) [][]float64 {
+	n := len(coords)
+	reversed := make([][]float64, n)
+	for i, coord := range coords {
+		reversed[n-1-i] = coord
+	}
+	return reversed
+}
 
-	for _, geom := range topo.Objects["collection"].Geometries {
+// convertToGeoJSON transforma un TopoJSON a una colección de features GeoJSON.
+// Devuelve error si la clave "collection" no existe.
+func convertToGeoJSON(topo *TopoJSON) (*geojson.FeatureCollection, error) {
+	collection, ok := topo.Objects["collection"]
+	if !ok {
+		return nil, errors.New("la clave 'collection' no existe en topo.Objects")
+	}
+
+	features := make([]*geojson.Feature, 0, len(collection.Geometries))
+	for _, geom := range collection.Geometries {
 		coords := convertArcsToCoordinates(geom.Arcs, topo.Arcs)
 		feature := geojson.NewFeature(coords)
 		feature.Properties = make(map[string]interface{})
-
 		for k, v := range geom.Properties {
 			feature.Properties[k] = v
 		}
-
 		features = append(features, feature)
 	}
-
 	return &geojson.FeatureCollection{
 		Type:     "FeatureCollection",
 		Features: features,
-	}
+	}, nil
 }
 
+// convertArcsToCoordinates convierte las referencias de arcos a coordenadas reales,
+// invirtiendo el orden en caso de índices negativos.
 func convertArcsToCoordinates(arcs [][][]int, topoArcs [][][]float64) *geojson.Geometry {
-	// Validación de entrada
 	if len(arcs) == 0 {
 		return &geojson.Geometry{
 			Type:    "Polygon",
@@ -62,30 +81,31 @@ func convertArcsToCoordinates(arcs [][][]int, topoArcs [][][]float64) *geojson.G
 		}
 	}
 
-	coords := make([][][]float64, 0, len(arcs[0]))
+	coords := make([][][]float64, 0, len(arcs))
 
-	for _, arcRing := range arcs {
+	// Procesar cada anillo del polígono
+	for _, ring := range arcs {
 		ringCoords := make([][]float64, 0)
 
-		for _, arcIndex := range arcRing {
-			// Validar que el índice está en rango
-			if len(arcIndex) == 0 {
-				continue
-			}
+		// Procesar cada arco en el anillo
+		for _, arcIndices := range ring {
+			for _, idx := range arcIndices {
+				// Manejar índices negativos
+				actualIdx := idx
+				if idx < 0 {
+					actualIdx = len(topoArcs) + idx
+				}
 
-			index := arcIndex[0]
-			// Convertir índices negativos a positivos si es necesario
-			if index < 0 {
-				index = len(topoArcs) + index
-			}
-
-			// Validar que el índice está en rango
-			if index >= 0 && index < len(topoArcs) {
-				lineCoords := topoArcs[index]
-				ringCoords = append(ringCoords, lineCoords...)
+				if actualIdx >= 0 && actualIdx < len(topoArcs) {
+					// Añadir todas las coordenadas del arco
+					for _, coord := range topoArcs[actualIdx] {
+						ringCoords = append(ringCoords, coord)
+					}
+				}
 			}
 		}
 
+		// Solo añadir el anillo si tiene coordenadas
 		if len(ringCoords) > 0 {
 			coords = append(coords, ringCoords)
 		}
@@ -97,6 +117,7 @@ func convertArcsToCoordinates(arcs [][][]int, topoArcs [][][]float64) *geojson.G
 	}
 }
 
+// mapToSlice convierte un mapa de cadenas en un slice.
 func mapToSlice(m map[string]struct{}) []string {
 	slice := make([]string, 0, len(m))
 	for k := range m {
@@ -105,63 +126,68 @@ func mapToSlice(m map[string]struct{}) []string {
 	return slice
 }
 
+// GetMunicipios filtra y devuelve las features cuyo valor de propiedad coincide parcialmente con el query.
+// El parámetro whatIs debe ser "D", "M" o "NAM".
 func GetMunicipios(query, whatIs string) (*geojson.FeatureCollection, error) {
 	if whatIs != "D" && whatIs != "M" && whatIs != "NAM" {
 		return nil, errors.New("el segundo parámetro debe ser 'M', 'D' o 'NAM'")
 	}
 
-	data, err := readTopoJSON("./utils/assets/topo.json")
+	topo, err := readTopoJSON("./utils/assets/topo.json")
 	if err != nil {
 		return nil, err
 	}
 
-	geojsonFC := convertToGeoJSON(data)
-	features := make([]*geojson.Feature, 0)
+	geojsonFC, err := convertToGeoJSON(topo)
+	if err != nil {
+		return nil, err
+	}
 
+	filteredFeatures := make([]*geojson.Feature, 0)
 	for _, feature := range geojsonFC.Features {
 		if feature.Properties == nil {
 			continue
 		}
 
-		propertyValue, ok := feature.Properties[whatIs].(string)
+		propVal, ok := feature.Properties[whatIs].(string)
 		if !ok {
 			continue
 		}
 
-		// Convertir ambos a minúsculas y buscar coincidencia parcial
-		propertyLower := strings.ToLower(propertyValue)
-		queryLower := strings.ToLower(query)
-
-		if strings.Contains(propertyLower, queryLower) {
-			features = append(features, feature)
+		// Comparación en minúsculas para permitir coincidencias parciales.
+		if strings.Contains(strings.ToLower(propVal), strings.ToLower(query)) {
+			filteredFeatures = append(filteredFeatures, feature)
 		}
 	}
 
 	return &geojson.FeatureCollection{
 		Type:     "FeatureCollection",
-		Features: features,
+		Features: filteredFeatures,
 	}, nil
 }
 
+// GetGeoData extrae la información de departamentos, municipios y distritos
+// de las propiedades de las features.
 func GetGeoData() (*GeoData, error) {
-	data, err := readTopoJSON("./utils/assets/topo.json")
+	topo, err := readTopoJSON("./utils/assets/topo.json")
 	if err != nil {
 		return nil, err
 	}
 
-	geojsonFC := convertToGeoJSON(data)
+	geojsonFC, err := convertToGeoJSON(topo)
+	if err != nil {
+		return nil, err
+	}
 
 	departamentos := make(map[string]struct{})
 	municipios := make(map[string]struct{})
 	distritos := make(map[string]struct{})
 
 	for _, feature := range geojsonFC.Features {
-		// Validar que las propiedades existan
 		if feature.Properties == nil {
 			continue
 		}
 
-		// Validar y convertir cada propiedad de forma segura
 		if d, ok := feature.Properties["D"].(string); ok && d != "" {
 			departamentos[d] = struct{}{}
 		}
@@ -180,6 +206,7 @@ func GetGeoData() (*GeoData, error) {
 	}, nil
 }
 
+// readTopoJSON lee y deserializa un archivo TopoJSON desde la ruta especificada.
 func readTopoJSON(path string) (*TopoJSON, error) {
 	file, err := os.ReadFile(path)
 	if err != nil {
