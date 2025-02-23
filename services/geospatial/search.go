@@ -32,9 +32,9 @@ type Geometry struct {
 
 // GeoData contiene la información agrupada de departamentos, municipios y distritos.
 type GeoData struct {
-	Departamentos []string
-	Municipios    []string
-	Distritos     []string
+	Departamentos []string `json:"departamentos"`
+	Municipios    []string `json:"municipios"`
+	Distritos     []string `json:"distritos"`
 }
 
 // reverseCoordinates invierte el orden de las coordenadas en un slice.
@@ -73,48 +73,42 @@ func convertToGeoJSON(topo *TopoJSON) (*geojson.FeatureCollection, error) {
 
 // convertArcsToCoordinates convierte las referencias de arcos a coordenadas reales,
 // invirtiendo el orden en caso de índices negativos.
+func getArcCoords(idx int, topoArcs [][][]float64) [][]float64 {
+	if idx < 0 {
+		actualIdx := len(topoArcs) + idx
+		if actualIdx >= 0 && actualIdx < len(topoArcs) {
+			return reverseCoordinates(topoArcs[actualIdx])
+		}
+	} else if idx < len(topoArcs) {
+		return topoArcs[idx]
+	}
+	return nil
+}
+
 func convertArcsToCoordinates(arcs [][][]int, topoArcs [][][]float64) *geojson.Geometry {
 	if len(arcs) == 0 {
-		return &geojson.Geometry{
-			Type:    "Polygon",
-			Polygon: [][][]float64{},
-		}
+		return &geojson.Geometry{Type: "Polygon", Polygon: nil}
 	}
 
 	coords := make([][][]float64, 0, len(arcs))
-
-	// Procesar cada anillo del polígono
 	for _, ring := range arcs {
-		ringCoords := make([][]float64, 0)
-
-		// Procesar cada arco en el anillo
+		total := 0
 		for _, arcIndices := range ring {
 			for _, idx := range arcIndices {
-				// Manejar índices negativos
-				actualIdx := idx
-				if idx < 0 {
-					actualIdx = len(topoArcs) + idx
-				}
-
-				if actualIdx >= 0 && actualIdx < len(topoArcs) {
-					// Añadir todas las coordenadas del arco
-					for _, coord := range topoArcs[actualIdx] {
-						ringCoords = append(ringCoords, coord)
-					}
-				}
+				total += len(getArcCoords(idx, topoArcs))
 			}
 		}
-
-		// Solo añadir el anillo si tiene coordenadas
+		ringCoords := make([][]float64, 0, total)
+		for _, arcIndices := range ring {
+			for _, idx := range arcIndices {
+				ringCoords = append(ringCoords, getArcCoords(idx, topoArcs)...)
+			}
+		}
 		if len(ringCoords) > 0 {
 			coords = append(coords, ringCoords)
 		}
 	}
-
-	return &geojson.Geometry{
-		Type:    "Polygon",
-		Polygon: coords,
-	}
+	return &geojson.Geometry{Type: "Polygon", Polygon: coords}
 }
 
 // mapToSlice convierte un mapa de cadenas en un slice.
