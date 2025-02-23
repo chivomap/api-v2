@@ -5,16 +5,19 @@ import (
 
 	"chivomap.com/config"
 	"chivomap.com/handlers"
-
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
 func main() {
 	app := fiber.New()
 
-	// Conectar a la base de datos
-	config.ConnectDB()
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "*",
+		AllowHeaders: "Origin, Content-Type, Accept",
+	}))
 
+	config.ConnectDB()
 	handlers.SetupRoutes(app)
 
 	log.Println("🚀 Servidor corriendo en http://localhost:8080")
