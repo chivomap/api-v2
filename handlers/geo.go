@@ -7,18 +7,17 @@ import (
 	"chivomap.com/services"
 	"chivomap.com/services/geospatial"
 	"github.com/gofiber/fiber/v2"
-	geojson "github.com/paulmach/go.geojson"
 )
 
 type GeoHandler struct {
 	geoDataCache *services.CacheService[*geospatial.GeoData]
-	municCache   *services.CacheService[map[string]*geojson.FeatureCollection]
+	municCache   *services.CacheService[map[string]*geospatial.TopoJSON]
 }
 
 func NewGeoHandler() *GeoHandler {
 	return &GeoHandler{
 		geoDataCache: services.NewCacheService[*geospatial.GeoData](60), // 1 hora
-		municCache:   services.NewCacheService[map[string]*geojson.FeatureCollection](60),
+		municCache:   services.NewCacheService[map[string]*geospatial.TopoJSON](60),
 	}
 }
 
@@ -33,7 +32,6 @@ func (h *GeoHandler) GetMunicipios(c *fiber.Ctx) error {
 	}
 
 	cacheKey := whatIs + ":" + query
-
 	if cached, ok := h.municCache.Get(); ok {
 		if data, exists := cached[cacheKey]; exists {
 			return c.JSON(fiber.Map{
@@ -49,7 +47,7 @@ func (h *GeoHandler) GetMunicipios(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	cached := make(map[string]*geojson.FeatureCollection)
+	cached := make(map[string]*geospatial.TopoJSON)
 	cached[cacheKey] = data
 	h.municCache.Set(cached)
 
