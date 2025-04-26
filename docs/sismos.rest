@@ -1,0 +1,3 @@
+### Get all sismos
+GET http://localhost:8080/sismos
+

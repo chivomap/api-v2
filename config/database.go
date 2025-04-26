@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 
 	_ "github.com/tursodatabase/go-libsql"
 )
@@ -13,8 +12,13 @@ import (
 var DB *sql.DB
 
 func ConnectDB() {
-	dbURL := os.Getenv("TURSO_DATABASE_URL")
-	authToken := os.Getenv("TURSO_AUTH_TOKEN")
+	// Asegurarse de que la configuración esté cargada
+	if AppConfig.DatabaseURL == "" {
+		LoadConfig()
+	}
+
+	dbURL := AppConfig.DatabaseURL
+	authToken := AppConfig.DatabaseToken
 
 	if dbURL == "" || authToken == "" {
 		log.Fatal("❌ Faltan las credenciales de la base de datos. Configura TURSO_DATABASE_URL y TURSO_AUTH_TOKEN en .env")

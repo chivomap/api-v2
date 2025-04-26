@@ -1,0 +1,15 @@
+###* Local 
+### search data
+GET http://localhost:8080/geo/search-data
+
+### filter
+GET http://localhost:8080/geo/filter?query=Izalco&whatIs=NAM    
+
+
+##* Versión anterior de la api
+### geo data - version anterior
+GET https://chivomap-api.up.railway.app/api/geo/getGeoData
+
+### version anterior
+
+GET https://chivomap-api.up.railway.app/api/geo/filter?query=Izalco&whatIs=NAM

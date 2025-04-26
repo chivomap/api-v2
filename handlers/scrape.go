@@ -1,34 +1,42 @@
 package handlers
 
 import (
-	"log"
-
 	"chivomap.com/config"
 	"chivomap.com/models"
-
-	"github.com/gocolly/colly"
+	"chivomap.com/utils"
 	"github.com/gofiber/fiber/v2"
 )
 
-// Scrapea una página y almacena el título en la base de datos
+// ScrapeHandler maneja el endpoint para scraping de datos
 func ScrapeHandler(c *fiber.Ctx) error {
-	collector := colly.NewCollector()
-	var title string
+	// Consultar la base de datos
+	rows, err := config.DB.Query("SELECT id, title FROM scraped_data")
+	if err != nil {
+		utils.Error("Error al consultar la base de datos: %v", err)
+		return utils.RespondWithError(c, fiber.StatusInternalServerError, "Error al consultar la base de datos")
+	}
+	defer rows.Close()
 
-	collector.OnHTML("title", func(e *colly.HTMLElement) {
-		title = e.Text
+	// Convertir resultados a slice
+	var results []models.ScrapedData
+	for rows.Next() {
+		var data models.ScrapedData
+		if err := rows.Scan(&data.ID, &data.Title); err != nil {
+			utils.Error("Error al escanear datos: %v", err)
+			continue
+		}
+		results = append(results, data)
+	}
+
+	// Verificar errores durante la iteración
+	if err := rows.Err(); err != nil {
+		utils.Error("Error al iterar resultados: %v", err)
+		return utils.RespondWithError(c, fiber.StatusInternalServerError, "Error al procesar resultados")
+	}
+
+	// Devolver respuesta
+	return utils.SendResponse(c, fiber.Map{
+		"totalItems": len(results),
+		"items":      results,
 	})
-
-	err := collector.Visit("https://example.com")
-	if err != nil {
-		log.Println("❌ Error en scraping:", err)
-		return c.Status(500).JSON(fiber.Map{"error": "Scraping fallido"})
-	}
-
-	_, err = config.DB.Exec("INSERT INTO scraped_data (title) VALUES (?)", title)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Error guardando en DB"})
-	}
-
-	return c.JSON(models.ScrapedData{Title: title})
 }

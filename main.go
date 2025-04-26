@@ -1,17 +1,30 @@
 package main
 
 import (
-	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"chivomap.com/config"
 	"chivomap.com/handlers"
+	"chivomap.com/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
 func main() {
-	app := fiber.New()
+	// Cargar configuración
+	config.LoadConfig()
 
+	// Inicializar Fiber
+	app := fiber.New(fiber.Config{
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			return utils.RespondWithError(c, fiber.StatusInternalServerError,
+				"Error interno del servidor")
+		},
+	})
+
+	// Configurar CORS
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "http://localhost:5173, https://chivomap.com",
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
@@ -19,9 +32,37 @@ func main() {
 		AllowCredentials: false,
 	}))
 
+	// Conectar a la base de datos
 	config.ConnectDB()
+
+	// Configurar rutas
 	handlers.SetupRoutes(app)
 
-	log.Println("🚀 Servidor corriendo en http://localhost:8080")
-	log.Fatal(app.Listen(":8080"))
+	// Configurar canal para cierre graceful
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	// Iniciar el servidor en una goroutine
+	go func() {
+		serverPort := ":" + config.AppConfig.ServerPort
+		if serverPort == ":" {
+			serverPort = ":8080"
+		}
+
+		utils.Info("🚀 Servidor corriendo en http://localhost%s", serverPort)
+		if err := app.Listen(serverPort); err != nil {
+			utils.Fatal("Error al iniciar el servidor: %v", err)
+		}
+	}()
+
+	// Esperar señal de cierre
+	<-c
+	utils.Info("Cerrando servidor gracefully...")
+
+	// Cerrar servidor
+	if err := app.Shutdown(); err != nil {
+		utils.Error("Error al cerrar el servidor: %v", err)
+	}
+
+	utils.Info("✅ Servidor cerrado correctamente")
 }

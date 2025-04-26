@@ -1,73 +1,76 @@
 package handlers
 
 import (
-	"log"
-	"time"
-
 	"chivomap.com/services"
 	"chivomap.com/services/scraping"
+	"chivomap.com/utils"
 
 	"github.com/gofiber/fiber/v2"
 )
 
-// Creamos una instancia global de caché para un slice de sismos con TTL de 3 minutos.
-var sismosCache = services.NewCacheService[[]scraping.Sismo](3)
+// SismosHandler maneja los endpoints relacionados con sismos
+type SismosHandler struct {
+	cache *services.CacheService[[]scraping.Sismo]
+}
 
-// updateCacheInBackground actualiza la caché en segundo plano.
-func updateCacheInBackground() {
-	sismosCache.SetUpdating(true)
-	defer sismosCache.SetUpdating(false)
+// NewSismosHandler crea una nueva instancia de SismosHandler
+func NewSismosHandler() *SismosHandler {
+	return &SismosHandler{
+		cache: services.NewCacheService[[]scraping.Sismo](3), // 3 minutos TTL
+	}
+}
+
+// updateCacheInBackground actualiza la caché en segundo plano
+func (h *SismosHandler) updateCacheInBackground() {
+	h.cache.SetUpdating(true)
+	defer h.cache.SetUpdating(false)
 
 	newData, err := scraping.ScrapeSismos()
 	if err != nil {
-		log.Println("❌ Error al actualizar caché:", err)
+		utils.Error("Error al actualizar caché: %v", err)
 		return
 	}
-	sismosCache.Set(newData)
+	h.cache.Set(newData)
 }
 
-// GetSismos maneja el endpoint GET /sismos.
-// Devuelve los datos en caché si están disponibles y, si la caché ha expirado, inicia una actualización en background.
-func GetSismos(c *fiber.Ctx) error {
-	if data, ok := sismosCache.Get(); ok {
-		// Si la caché necesita actualización, se lanza en background.
-		if sismosCache.NeedsUpdate() {
-			go updateCacheInBackground()
+// GetSismos maneja el endpoint GET /sismos
+func (h *SismosHandler) GetSismos(c *fiber.Ctx) error {
+	if data, ok := h.cache.Get(); ok {
+		// Si la caché necesita actualización, se lanza en background
+		if h.cache.NeedsUpdate() {
+			go h.updateCacheInBackground()
 		}
-		return c.JSON(fiber.Map{
-			"timestamp":   map[string]string{"time": time.Now().Format("2006-01-02 15:04:05")},
+		return utils.SendResponse(c, fiber.Map{
 			"totalSismos": len(data),
 			"data":        data,
 		})
 	}
 
-	// Primera carga: no hay datos en caché.
-	log.Println("⏳ Primera carga, obteniendo datos...")
+	// Primera carga: no hay datos en caché
+	utils.Info("Primera carga, obteniendo datos...")
 	data, err := scraping.ScrapeSismos()
 	if err != nil {
-		log.Println("❌ Error en el scraping:", err)
-		return c.Status(500).JSON(fiber.Map{"error": "No se pudieron obtener los datos"})
+		utils.Error("Error en el scraping: %v", err)
+		return utils.RespondWithError(c, fiber.StatusInternalServerError, "No se pudieron obtener los datos")
 	}
-	sismosCache.Set(data)
-	return c.JSON(fiber.Map{
-		"timestamp":   map[string]string{"time": time.Now().Format("2006-01-02 15:04:05")},
+	h.cache.Set(data)
+	return utils.SendResponse(c, fiber.Map{
 		"totalSismos": len(data),
 		"data":        data,
 	})
 }
 
-// ForceRefreshSismos permite forzar la actualización de la caché mediante el endpoint GET /sismos/refresh.
-func ForceRefreshSismos(c *fiber.Ctx) error {
-	log.Println("🔄 Forzando actualización del cache...")
+// ForceRefreshSismos permite forzar la actualización de la caché mediante el endpoint GET /sismos/refresh
+func (h *SismosHandler) ForceRefreshSismos(c *fiber.Ctx) error {
+	utils.Info("Forzando actualización del cache...")
 	data, err := scraping.ScrapeSismos()
 	if err != nil {
-		log.Println("❌ Error al refrescar los datos:", err)
-		return c.Status(500).JSON(fiber.Map{"error": "No se pudieron actualizar los datos"})
+		utils.Error("Error al refrescar los datos: %v", err)
+		return utils.RespondWithError(c, fiber.StatusInternalServerError, "No se pudieron actualizar los datos")
 	}
-	sismosCache.Set(data)
-	return c.JSON(fiber.Map{
+	h.cache.Set(data)
+	return utils.SendResponse(c, fiber.Map{
 		"message":     "Cache actualizada exitosamente",
-		"timestamp":   map[string]string{"time": time.Now().Format("2006-01-02 15:04:05")},
 		"totalSismos": len(data),
 		"data":        data,
 	})
