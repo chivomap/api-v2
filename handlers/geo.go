@@ -11,13 +11,14 @@ import (
 
 type GeoHandler struct {
 	geoDataCache *services.CacheService[*geospatial.GeoData]
-	municCache   *services.CacheService[map[string]*geospatial.TopoJSON]
+	// Se actualizó el tipo de caché para que almacene un mapa de GeoFeatureCollection
+	municCache *services.CacheService[map[string]*geospatial.GeoFeatureCollection]
 }
 
 func NewGeoHandler() *GeoHandler {
 	return &GeoHandler{
 		geoDataCache: services.NewCacheService[*geospatial.GeoData](60), // 1 hora
-		municCache:   services.NewCacheService[map[string]*geospatial.TopoJSON](60),
+		municCache:   services.NewCacheService[map[string]*geospatial.GeoFeatureCollection](60),
 	}
 }
 
@@ -47,7 +48,7 @@ func (h *GeoHandler) GetMunicipios(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	cached := make(map[string]*geospatial.TopoJSON)
+	cached := make(map[string]*geospatial.GeoFeatureCollection)
 	cached[cacheKey] = data
 	h.municCache.Set(cached)
 
