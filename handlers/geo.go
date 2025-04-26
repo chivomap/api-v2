@@ -22,6 +22,16 @@ func NewGeoHandler() *GeoHandler {
 }
 
 // GetMunicipios maneja el endpoint para filtrar municipios
+// @Summary Filtrar datos geoespaciales
+// @Description Filtra datos geoespaciales según parámetros
+// @Tags geo
+// @Produce json
+// @Param query query string true "Cadena de búsqueda"
+// @Param whatIs query string true "Tipo de filtro (departamento, municipio, etc.)"
+// @Success 200 {object} GeoFilterResponse "Resultados filtrados"
+// @Failure 400 {object} ErrorResponse "Parámetros inválidos"
+// @Failure 500 {object} ErrorResponse "Error interno"
+// @Router /geo/filter [get]
 func (h *GeoHandler) GetMunicipios(c *fiber.Ctx) error {
 	query := c.Query("query")
 	whatIs := c.Query("whatIs")
@@ -52,6 +62,13 @@ func (h *GeoHandler) GetMunicipios(c *fiber.Ctx) error {
 }
 
 // GetGeoData maneja el endpoint para obtener datos geográficos
+// @Summary Obtiene datos geográficos
+// @Description Retorna datos geográficos completos de El Salvador
+// @Tags geo
+// @Produce json
+// @Success 200 {object} GeoDataResponse "Datos geográficos"
+// @Failure 500 {object} ErrorResponse "Error interno"
+// @Router /geo/search-data [get]
 func (h *GeoHandler) GetGeoData(c *fiber.Ctx) error {
 	if data, ok := h.geoDataCache.Get(); ok {
 		if h.geoDataCache.NeedsUpdate() {

@@ -6,12 +6,25 @@ import (
 	"syscall"
 
 	"chivomap.com/config"
+	_ "chivomap.com/docs" // Importación necesaria para Swagger
 	"chivomap.com/handlers"
 	"chivomap.com/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/recover"
 )
 
+// @title ChivoMap API
+// @version 1.0
+// @description API que proporciona datos geoespaciales y sísmicos de El Salvador.
+// @termsOfService http://swagger.io/terms/
+// @contact.name API Support
+// @contact.url https://chivomap.com/support
+// @contact.email support@chivomap.com
+// @license.name MIT License
+// @license.url https://github.com/oclazi/chivomap-api/blob/main/LICENSE.md
+// @host localhost:8080
+// @BasePath /
 func main() {
 	// Cargar configuración
 	config.LoadConfig()
@@ -23,6 +36,9 @@ func main() {
 				"Error interno del servidor")
 		},
 	})
+
+	// Middleware de recuperación de errores
+	app.Use(recover.New())
 
 	// Configurar CORS
 	app.Use(cors.New(cors.Config{
@@ -38,6 +54,9 @@ func main() {
 	// Configurar rutas
 	handlers.SetupRoutes(app)
 
+	// Configurar Swagger con tema oscuro y toggle
+	utils.SetupSwagger(app)
+
 	// Configurar canal para cierre graceful
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -50,6 +69,7 @@ func main() {
 		}
 
 		utils.Info("🚀 Servidor corriendo en http://localhost%s", serverPort)
+		utils.Info("📚 Documentación Swagger disponible en http://localhost%s/docs/", serverPort)
 		if err := app.Listen(serverPort); err != nil {
 			utils.Fatal("Error al iniciar el servidor: %v", err)
 		}

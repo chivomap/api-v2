@@ -1,0 +1,231 @@
+basePath: /
+definitions:
+  geospatial.GeoData:
+    properties:
+      departamentos:
+        items:
+          type: string
+        type: array
+      distritos:
+        items:
+          type: string
+        type: array
+      municipios:
+        items:
+          type: string
+        type: array
+    type: object
+  handlers.ErrorResponse:
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  handlers.GeoDataResponse:
+    properties:
+      geoData:
+        $ref: '#/definitions/geospatial.GeoData'
+    type: object
+  handlers.GeoFilterResponse:
+    properties:
+      features:
+        items:
+          additionalProperties: true
+          type: object
+        type: array
+      type:
+        type: string
+    type: object
+  handlers.HealthResponse:
+    properties:
+      status:
+        type: string
+      version:
+        type: string
+    type: object
+  handlers.ScrapeResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/models.ScrapedData'
+        type: array
+      totalItems:
+        type: integer
+    type: object
+  handlers.SismosRefreshResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/scraping.Sismo'
+        type: array
+      message:
+        type: string
+      totalSismos:
+        type: integer
+    type: object
+  handlers.SismosResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/scraping.Sismo'
+        type: array
+      totalSismos:
+        type: integer
+    type: object
+  models.ScrapedData:
+    properties:
+      id:
+        type: integer
+      title:
+        type: string
+    type: object
+  scraping.Sismo:
+    properties:
+      estado:
+        type: string
+      fases:
+        type: string
+      fecha:
+        type: string
+      latitud:
+        type: string
+      localizacion:
+        type: string
+      longitud:
+        type: string
+      magnitud:
+        type: string
+      profundidad:
+        type: string
+      rms:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@chivomap.com
+    name: API Support
+    url: https://chivomap.com/support
+  description: API que proporciona datos geoespaciales y sísmicos de El Salvador.
+  license:
+    name: MIT License
+    url: https://github.com/oclazi/chivomap-api/blob/main/LICENSE.md
+  termsOfService: http://swagger.io/terms/
+  title: ChivoMap API
+  version: "1.0"
+paths:
+  /geo/filter:
+    get:
+      description: Filtra datos geoespaciales según parámetros
+      parameters:
+      - description: Cadena de búsqueda
+        in: query
+        name: query
+        required: true
+        type: string
+      - description: Tipo de filtro (departamento, municipio, etc.)
+        in: query
+        name: whatIs
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Resultados filtrados
+          schema:
+            $ref: '#/definitions/handlers.GeoFilterResponse'
+        "400":
+          description: Parámetros inválidos
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Error interno
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Filtrar datos geoespaciales
+      tags:
+      - geo
+  /geo/search-data:
+    get:
+      description: Retorna datos geográficos completos de El Salvador
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Datos geográficos
+          schema:
+            $ref: '#/definitions/handlers.GeoDataResponse'
+        "500":
+          description: Error interno
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Obtiene datos geográficos
+      tags:
+      - geo
+  /health:
+    get:
+      description: Retorna el estado actual de la API
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Estado de la API
+          schema:
+            $ref: '#/definitions/handlers.HealthResponse'
+      summary: Verificación del estado de la API
+      tags:
+      - health
+  /scrape:
+    get:
+      description: Retorna datos obtenidos mediante web scraping
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Datos scrapeados
+          schema:
+            $ref: '#/definitions/handlers.ScrapeResponse'
+        "500":
+          description: Error interno
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Obtiene datos scrapeados
+      tags:
+      - scraping
+  /sismos:
+    get:
+      description: Retorna una lista de sismos recientes en El Salvador
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Lista de sismos recientes
+          schema:
+            $ref: '#/definitions/handlers.SismosResponse'
+        "500":
+          description: Error al obtener datos
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Obtiene información de sismos recientes
+      tags:
+      - sismos
+  /sismos/refresh:
+    get:
+      description: Actualiza forzosamente la caché de sismos recientes
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Caché actualizada exitosamente
+          schema:
+            $ref: '#/definitions/handlers.SismosRefreshResponse'
+        "500":
+          description: Error al actualizar datos
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Fuerza la actualización de datos sísmicos
+      tags:
+      - sismos
+swagger: "2.0"

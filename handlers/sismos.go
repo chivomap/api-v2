@@ -34,6 +34,13 @@ func (h *SismosHandler) updateCacheInBackground() {
 }
 
 // GetSismos maneja el endpoint GET /sismos
+// @Summary Obtiene información de sismos recientes
+// @Description Retorna una lista de sismos recientes en El Salvador
+// @Tags sismos
+// @Produce json
+// @Success 200 {object} SismosResponse "Lista de sismos recientes"
+// @Failure 500 {object} ErrorResponse "Error al obtener datos"
+// @Router /sismos [get]
 func (h *SismosHandler) GetSismos(c *fiber.Ctx) error {
 	if data, ok := h.cache.Get(); ok {
 		// Si la caché necesita actualización, se lanza en background
@@ -61,6 +68,13 @@ func (h *SismosHandler) GetSismos(c *fiber.Ctx) error {
 }
 
 // ForceRefreshSismos permite forzar la actualización de la caché mediante el endpoint GET /sismos/refresh
+// @Summary Fuerza la actualización de datos sísmicos
+// @Description Actualiza forzosamente la caché de sismos recientes
+// @Tags sismos
+// @Produce json
+// @Success 200 {object} SismosRefreshResponse "Caché actualizada exitosamente"
+// @Failure 500 {object} ErrorResponse "Error al actualizar datos"
+// @Router /sismos/refresh [get]
 func (h *SismosHandler) ForceRefreshSismos(c *fiber.Ctx) error {
 	utils.Info("Forzando actualización del cache...")
 	data, err := scraping.ScrapeSismos()

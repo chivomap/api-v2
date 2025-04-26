@@ -7,8 +7,11 @@ import (
 
 // Config contiene toda la configuración de la aplicación
 type Config struct {
-	ServerPort    string
-	DatabaseURL   string
+	// Puerto del servidor HTTP
+	ServerPort string
+	// URL de la base de datos Turso
+	DatabaseURL string
+	// Token de autenticación para la base de datos Turso
 	DatabaseToken string
 }
 
@@ -22,6 +25,8 @@ func LoadConfig() {
 		DatabaseURL:   getEnv("TURSO_DATABASE_URL"),
 		DatabaseToken: getEnv("TURSO_AUTH_TOKEN"),
 	}
+
+	log.Printf("Configuración cargada: Puerto=%s", AppConfig.ServerPort)
 }
 
 // getEnv obtiene una variable de entorno requerida

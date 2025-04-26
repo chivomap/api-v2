@@ -8,6 +8,13 @@ import (
 )
 
 // ScrapeHandler maneja el endpoint para scraping de datos
+// @Summary Obtiene datos scrapeados
+// @Description Retorna datos obtenidos mediante web scraping
+// @Tags scraping
+// @Produce json
+// @Success 200 {object} ScrapeResponse "Datos scrapeados"
+// @Failure 500 {object} ErrorResponse "Error interno"
+// @Router /scrape [get]
 func ScrapeHandler(c *fiber.Ctx) error {
 	// Consultar la base de datos
 	rows, err := config.DB.Query("SELECT id, title FROM scraped_data")

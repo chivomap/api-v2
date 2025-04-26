@@ -1,0 +1,352 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API que proporciona datos geoespaciales y sísmicos de El Salvador.",
+        "title": "ChivoMap API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "url": "https://chivomap.com/support",
+            "email": "support@chivomap.com"
+        },
+        "license": {
+            "name": "MIT License",
+            "url": "https://github.com/oclazi/chivomap-api/blob/main/LICENSE.md"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/geo/filter": {
+            "get": {
+                "description": "Filtra datos geoespaciales según parámetros",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "geo"
+                ],
+                "summary": "Filtrar datos geoespaciales",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Cadena de búsqueda",
+                        "name": "query",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tipo de filtro (departamento, municipio, etc.)",
+                        "name": "whatIs",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Resultados filtrados",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.GeoFilterResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Parámetros inválidos",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Error interno",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/geo/search-data": {
+            "get": {
+                "description": "Retorna datos geográficos completos de El Salvador",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "geo"
+                ],
+                "summary": "Obtiene datos geográficos",
+                "responses": {
+                    "200": {
+                        "description": "Datos geográficos",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.GeoDataResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Error interno",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Retorna el estado actual de la API",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Verificación del estado de la API",
+                "responses": {
+                    "200": {
+                        "description": "Estado de la API",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.HealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/scrape": {
+            "get": {
+                "description": "Retorna datos obtenidos mediante web scraping",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "scraping"
+                ],
+                "summary": "Obtiene datos scrapeados",
+                "responses": {
+                    "200": {
+                        "description": "Datos scrapeados",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ScrapeResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Error interno",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/sismos": {
+            "get": {
+                "description": "Retorna una lista de sismos recientes en El Salvador",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sismos"
+                ],
+                "summary": "Obtiene información de sismos recientes",
+                "responses": {
+                    "200": {
+                        "description": "Lista de sismos recientes",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SismosResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Error al obtener datos",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/sismos/refresh": {
+            "get": {
+                "description": "Actualiza forzosamente la caché de sismos recientes",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sismos"
+                ],
+                "summary": "Fuerza la actualización de datos sísmicos",
+                "responses": {
+                    "200": {
+                        "description": "Caché actualizada exitosamente",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SismosRefreshResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Error al actualizar datos",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "geospatial.GeoData": {
+            "type": "object",
+            "properties": {
+                "departamentos": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "distritos": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "municipios": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "handlers.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.GeoDataResponse": {
+            "type": "object",
+            "properties": {
+                "geoData": {
+                    "$ref": "#/definitions/geospatial.GeoData"
+                }
+            }
+        },
+        "handlers.GeoFilterResponse": {
+            "type": "object",
+            "properties": {
+                "features": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                    }
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.ScrapeResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ScrapedData"
+                    }
+                },
+                "totalItems": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.SismosRefreshResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/scraping.Sismo"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "totalSismos": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.SismosResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/scraping.Sismo"
+                    }
+                },
+                "totalSismos": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.ScrapedData": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "scraping.Sismo": {
+            "type": "object",
+            "properties": {
+                "estado": {
+                    "type": "string"
+                },
+                "fases": {
+                    "type": "string"
+                },
+                "fecha": {
+                    "type": "string"
+                },
+                "latitud": {
+                    "type": "string"
+                },
+                "localizacion": {
+                    "type": "string"
+                },
+                "longitud": {
+                    "type": "string"
+                },
+                "magnitud": {
+                    "type": "string"
+                },
+                "profundidad": {
+                    "type": "string"
+                },
+                "rms": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}
