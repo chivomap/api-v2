@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"context"
+	"time"
+	
 	"chivomap.com/config"
 	"chivomap.com/models"
 	"chivomap.com/utils"
@@ -16,8 +19,12 @@ import (
 // @Failure 500 {object} ErrorResponse "Error interno"
 // @Router /scrape [get]
 func ScrapeHandler(c *fiber.Ctx) error {
-	// Consultar la base de datos
-	rows, err := config.DB.Query("SELECT id, title FROM scraped_data")
+	// Crear contexto con timeout para la consulta
+	ctx, cancel := context.WithTimeout(c.Context(), 10*time.Second)
+	defer cancel()
+	
+	// Consultar la base de datos con contexto
+	rows, err := config.DB.QueryContext(ctx, "SELECT id, title FROM scraped_data")
 	if err != nil {
 		utils.Error("Error al consultar la base de datos: %v", err)
 		return utils.RespondWithError(c, fiber.StatusInternalServerError, "Error al consultar la base de datos")

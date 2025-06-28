@@ -44,7 +44,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Tipo de filtro (departamento, municipio, etc.)",
+                        "description": "Tipo de filtro: D (departamentos), M (municipios), NAM (nombres/ubicaciones)",
                         "name": "whatIs",
                         "in": "query",
                         "required": true

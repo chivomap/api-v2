@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
+	
+	"chivomap.com/config"
 )
 
 // Transform contiene la escala y traslación para reconstruir las coordenadas.
@@ -235,7 +238,8 @@ func GetMunicipios(query, whatIs string) (*GeoFeatureCollection, error) {
 	if whatIs != "D" && whatIs != "M" && whatIs != "NAM" {
 		return nil, errors.New("el segundo parámetro debe ser 'M', 'D' o 'NAM'")
 	}
-	topo, err := readTopoJSON("./utils/assets/topo.json")
+	topoPath := filepath.Join(config.AppConfig.AssetsDir, "topo.json")
+	topo, err := readTopoJSON(topoPath)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +268,8 @@ func GetMunicipios(query, whatIs string) (*GeoFeatureCollection, error) {
 
 // GetGeoData extrae nombres únicos de departamentos, municipios y distritos a partir del TopoJSON.
 func GetGeoData() (*GeoData, error) {
-	topo, err := readTopoJSON("./utils/assets/topo.json")
+	topoPath := filepath.Join(config.AppConfig.AssetsDir, "topo.json")
+	topo, err := readTopoJSON(topoPath)
 	if err != nil {
 		return nil, err
 	}

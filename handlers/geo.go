@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"sync"
+	
 	"chivomap.com/services"
 	"chivomap.com/services/geospatial"
 	"chivomap.com/utils"
@@ -11,6 +13,7 @@ import (
 type GeoHandler struct {
 	geoDataCache *services.CacheService[*geospatial.GeoData]
 	municCache   *services.CacheService[map[string]*geospatial.GeoFeatureCollection]
+	cacheMutex   sync.RWMutex // Protege operaciones de cache
 }
 
 // NewGeoHandler crea una nueva instancia de GeoHandler
@@ -27,7 +30,7 @@ func NewGeoHandler() *GeoHandler {
 // @Tags geo
 // @Produce json
 // @Param query query string true "Cadena de búsqueda"
-// @Param whatIs query string true "Tipo de filtro (departamento, municipio, etc.)"
+// @Param whatIs query string true "Tipo de filtro: D (departamentos), M (municipios), NAM (nombres/ubicaciones)"
 // @Success 200 {object} GeoFilterResponse "Resultados filtrados"
 // @Failure 400 {object} ErrorResponse "Parámetros inválidos"
 // @Failure 500 {object} ErrorResponse "Error interno"
@@ -36,27 +39,44 @@ func (h *GeoHandler) GetMunicipios(c *fiber.Ctx) error {
 	query := c.Query("query")
 	whatIs := c.Query("whatIs")
 
-	if query == "" || whatIs == "" {
+	// Validar parámetros
+	validatedQuery, validQuery := utils.ValidateQuery(query)
+	validatedWhatIs, validWhatIs := utils.ValidateWhatIs(whatIs)
+
+	if !validQuery || !validWhatIs {
 		return utils.RespondWithError(c, fiber.StatusBadRequest,
-			"Se requieren los parámetros 'query' y 'whatIs'")
+			"Parámetros inválidos. 'query' debe ser una cadena válida (máx 100 chars) y 'whatIs' debe ser: D, M, o NAM")
 	}
 
-	cacheKey := whatIs + ":" + query
+	// Usar valores validados
+	cacheKey := validatedWhatIs + ":" + validatedQuery
+	
+	// Check cache with read lock
+	h.cacheMutex.RLock()
 	if cached, ok := h.municCache.Get(); ok {
 		if data, exists := cached[cacheKey]; exists {
+			h.cacheMutex.RUnlock()
 			return utils.SendResponse(c, data)
 		}
 	}
+	h.cacheMutex.RUnlock()
 
-	data, err := geospatial.GetMunicipios(query, whatIs)
+	// Los valores ya están validados y en el formato correcto (D, M, NAM)
+	data, err := geospatial.GetMunicipios(validatedQuery, validatedWhatIs)
 	if err != nil {
 		utils.Error("Error al obtener municipios: %v", err)
 		return utils.RespondWithError(c, fiber.StatusInternalServerError, err.Error())
 	}
 
-	cached := make(map[string]*geospatial.GeoFeatureCollection)
+	// Update cache with write lock
+	h.cacheMutex.Lock()
+	cached, _ := h.municCache.Get()
+	if cached == nil {
+		cached = make(map[string]*geospatial.GeoFeatureCollection)
+	}
 	cached[cacheKey] = data
 	h.municCache.Set(cached)
+	h.cacheMutex.Unlock()
 
 	return utils.SendResponse(c, data)
 }

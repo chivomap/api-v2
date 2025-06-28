@@ -84,5 +84,18 @@ func main() {
 		utils.Error("Error al cerrar el servidor: %v", err)
 	}
 
+	// Cerrar conexiones de base de datos
+	if config.DB != nil {
+		if err := config.DB.Close(); err != nil {
+			utils.Error("Error al cerrar la base de datos principal: %v", err)
+		}
+	}
+	
+	if config.CensoDB != nil {
+		if err := config.CensoDB.Close(); err != nil {
+			utils.Error("Error al cerrar la base de datos del censo: %v", err)
+		}
+	}
+
 	utils.Info("✅ Servidor cerrado correctamente")
 }

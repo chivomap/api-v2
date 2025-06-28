@@ -2,7 +2,7 @@ package scraping
 
 import (
 	"fmt"
-	"log"
+	"os"
 	"time"
 
 	"github.com/playwright-community/playwright-go"
@@ -25,19 +25,19 @@ type Sismo struct {
 func ScrapeSismos() ([]Sismo, error) {
 	pw, err := playwright.Run()
 	if err != nil {
-		log.Fatalf("Error al iniciar Playwright: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("error al iniciar Playwright: %w", err)
 	}
 	defer pw.Stop()
 
 	// Lanzar navegador
+	// Usar headless mode basado en variable de entorno (por defecto true para producción)
+	headless := os.Getenv("BROWSER_HEADLESS") != "false"
 	browser, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
-		Headless: playwright.Bool(false), // Cambia a true si quieres que sea sin interfaz
+		Headless: playwright.Bool(headless),
 		Timeout:  playwright.Float(60000),
 	})
 	if err != nil {
-		log.Fatalf("Error al lanzar navegador: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("error al lanzar navegador: %w", err)
 	}
 	defer browser.Close()
 
@@ -46,15 +46,13 @@ func ScrapeSismos() ([]Sismo, error) {
 		UserAgent: playwright.String("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
 	})
 	if err != nil {
-		log.Fatalf("Error al crear contexto: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("error al crear contexto del navegador: %w", err)
 	}
 
 	// Abrir nueva página
 	page, err := context.NewPage()
 	if err != nil {
-		log.Fatalf("Error al abrir página: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("error al abrir página: %w", err)
 	}
 	defer page.Close()
 
@@ -68,8 +66,7 @@ func ScrapeSismos() ([]Sismo, error) {
 		Timeout:   playwright.Float(60000),
 	})
 	if err != nil {
-		log.Fatalf("Error al navegar a la página: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("error al navegar a la página de sismos: %w", err)
 	}
 
 	// Esperar a que la tabla aparezca
@@ -78,8 +75,7 @@ func ScrapeSismos() ([]Sismo, error) {
 		Timeout: playwright.Float(60000),
 	})
 	if err != nil {
-		log.Fatalf("Error al esperar la tabla: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("error al esperar la tabla de sismos: %w", err)
 	}
 
 	// Esperar un poco más para asegurar que los datos se carguen
@@ -104,8 +100,7 @@ func ScrapeSismos() ([]Sismo, error) {
 		});
 	}`)
 	if err != nil {
-		log.Fatalf("Error al evaluar la tabla: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("error al extraer datos de la tabla: %w", err)
 	}
 
 	// Convertir los datos a una estructura de Go

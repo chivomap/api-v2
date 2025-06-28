@@ -2,3 +2,12 @@
 
 *.local.rest
 *.prod.rest
+CLAUDE.md
+
+# Large data files - should not be in repository
+utils/assets/Bases-Finales-CPV2024SV-CSV*
+*.csv
+chivomap-api
+
+# Database files (use external storage)
+data/*.db

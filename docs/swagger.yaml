@@ -124,7 +124,7 @@ paths:
         name: query
         required: true
         type: string
-      - description: Tipo de filtro (departamento, municipio, etc.)
+      - description: 'Tipo de filtro: D (departamentos), M (municipios), NAM (nombres/ubicaciones)'
         in: query
         name: whatIs
         required: true

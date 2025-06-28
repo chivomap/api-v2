@@ -21,11 +21,17 @@ func ConnectDB() {
 	dbURL := AppConfig.DatabaseURL
 	authToken := AppConfig.DatabaseToken
 
-	if dbURL == "" || authToken == "" {
-		log.Fatal("❌ Faltan las credenciales de la base de datos. Configura TURSO_DATABASE_URL y TURSO_AUTH_TOKEN en .env")
+	if dbURL == "" {
+		log.Fatal("❌ TURSO_DATABASE_URL es requerida. Configura en .env")
 	}
 
-	url := fmt.Sprintf("%s?authToken=%s", dbURL, authToken)
+	// Para SQLite local, el token no es necesario
+	var url string
+	if authToken != "" {
+		url = fmt.Sprintf("%s?authToken=%s", dbURL, authToken)
+	} else {
+		url = dbURL
+	}
 
 	var err error
 	DB, err = sql.Open("libsql", url)
