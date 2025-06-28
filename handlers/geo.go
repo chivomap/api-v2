@@ -5,22 +5,23 @@ import (
 	
 	"chivomap.com/services"
 	"chivomap.com/services/geospatial"
+	"chivomap.com/types"
 	"chivomap.com/utils"
 	"github.com/gofiber/fiber/v2"
 )
 
 // GeoHandler maneja los endpoints relacionados con datos geoespaciales
 type GeoHandler struct {
-	geoDataCache *services.CacheService[*geospatial.GeoData]
-	municCache   *services.CacheService[map[string]*geospatial.GeoFeatureCollection]
+	geoDataCache *services.CacheService[*types.GeoData]
+	municCache   *services.CacheService[map[string]*types.GeoFeatureCollection]
 	cacheMutex   sync.RWMutex // Protege operaciones de cache
 }
 
 // NewGeoHandler crea una nueva instancia de GeoHandler
 func NewGeoHandler() *GeoHandler {
 	return &GeoHandler{
-		geoDataCache: services.NewCacheService[*geospatial.GeoData](60), // 1 hora
-		municCache:   services.NewCacheService[map[string]*geospatial.GeoFeatureCollection](60),
+		geoDataCache: services.NewCacheService[*types.GeoData](60), // 1 hora
+		municCache:   services.NewCacheService[map[string]*types.GeoFeatureCollection](60),
 	}
 }
 
@@ -72,7 +73,7 @@ func (h *GeoHandler) GetMunicipios(c *fiber.Ctx) error {
 	h.cacheMutex.Lock()
 	cached, _ := h.municCache.Get()
 	if cached == nil {
-		cached = make(map[string]*geospatial.GeoFeatureCollection)
+		cached = make(map[string]*types.GeoFeatureCollection)
 	}
 	cached[cacheKey] = data
 	h.municCache.Set(cached)

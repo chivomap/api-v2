@@ -2,20 +2,14 @@ package handlers
 
 import (
 	"chivomap.com/models"
-	"chivomap.com/services/geospatial"
 	"chivomap.com/services/scraping"
+	"chivomap.com/types"
 )
 
 // ErrorResponse representa una respuesta de error estándar
 type ErrorResponse struct {
 	Error   string `json:"error"`
 	Message string `json:"message,omitempty"`
-}
-
-// HealthResponse representa la respuesta del endpoint de salud
-type HealthResponse struct {
-	Status  string `json:"status"`
-	Version string `json:"version"`
 }
 
 // SismosResponse representa la respuesta del endpoint de sismos
@@ -33,7 +27,7 @@ type SismosRefreshResponse struct {
 
 // GeoDataResponse representa la respuesta para datos geográficos
 type GeoDataResponse struct {
-	GeoData *geospatial.GeoData `json:"geoData"`
+	GeoData *types.GeoData `json:"geoData"`
 }
 
 // GeoFilterResponse representa la respuesta para datos filtrados

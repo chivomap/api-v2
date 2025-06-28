@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"chivomap.com/config"
 	_ "chivomap.com/docs" // Importación necesaria para Swagger
@@ -11,6 +12,7 @@ import (
 	"chivomap.com/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 )
 
@@ -29,16 +31,36 @@ func main() {
 	// Cargar configuración
 	config.LoadConfig()
 
-	// Inicializar Fiber
+	// Inicializar Fiber con límites de seguridad
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			return utils.RespondWithError(c, fiber.StatusInternalServerError,
 				"Error interno del servidor")
 		},
+		// Límites de seguridad para prevenir ataques DoS
+		BodyLimit:       10 * 1024 * 1024, // 10MB máximo
+		ReadTimeout:     30 * time.Second,
+		WriteTimeout:    30 * time.Second,
+		IdleTimeout:     120 * time.Second,
+		ReadBufferSize:  8192,
+		WriteBufferSize: 8192,
 	})
 
 	// Middleware de recuperación de errores
 	app.Use(recover.New())
+
+	// Rate limiting para prevenir abuso
+	app.Use(limiter.New(limiter.Config{
+		Max:        100,               // 100 requests
+		Expiration: 1 * time.Minute,   // por minuto
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return c.IP() // Por IP
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return utils.RespondWithError(c, fiber.StatusTooManyRequests,
+				"Demasiadas solicitudes. Intente de nuevo más tarde.")
+		},
+	}))
 
 	// Configurar CORS
 	app.Use(cors.New(cors.Config{
