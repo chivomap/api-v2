@@ -67,8 +67,13 @@ func main() {
 	}))
 
 	// Configurar CORS
+	allowedOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
+	if allowedOrigins == "" {
+		allowedOrigins = "http://localhost:5173,https://chivomap.com,https://www.chivomap.com"
+	}
+	
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:5173, https://chivomap.com",
+		AllowOrigins:     allowedOrigins,
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
 		AllowHeaders:     "Origin, Content-Type, Accept",
 		AllowCredentials: false,

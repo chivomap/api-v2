@@ -53,6 +53,22 @@ La documentación completa está disponible en la carpeta [`docs/`](docs/):
 - [Documentación de la API](docs/API.md)
 - [Arquitectura del Proyecto](docs/ARQUITECTURA.md)
 - [Documentación Swagger](docs/SWAGGER.md)
+- [**REST Client Collection**](docs/rest-client/) - Endpoints para VS Code REST Client
+
+### 🔧 REST Client (VS Code)
+
+Para probar los endpoints directamente desde VS Code:
+
+1. Instala la extensión [REST Client](https://marketplace.visualstudio.com/items?itemName=humao.rest-client)
+2. Abre cualquier archivo `.http` en [`docs/rest-client/`](docs/rest-client/)
+3. Haz clic en "Send Request" sobre cada endpoint
+
+Archivos disponibles:
+- `endpoints.http` - Todos los endpoints principales
+- `health.http` - Health checks
+- `sismos.http` - Endpoints sísmicos
+- `geo.http` - Endpoints geoespaciales
+- `testing.http` - Casos de prueba
 
 ## 🔍 Endpoints Principales
 

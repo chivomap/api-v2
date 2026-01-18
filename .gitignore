@@ -11,3 +11,4 @@ chivomap-api
 
 # Database files (use external storage)
 data/*.db
+.kiro/settings/mcp.json
