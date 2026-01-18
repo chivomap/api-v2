@@ -2,6 +2,7 @@ package geospatial
 
 import (
 	"fmt"
+	"strings"
 
 	"chivomap.com/interfaces"
 	"chivomap.com/types"
@@ -29,6 +30,10 @@ func GetMunicipios(staticCache interfaces.StaticCacheService, query, whatIs stri
 	if err != nil {
 		return nil, fmt.Errorf("error obteniendo datos geoespaciales para filtro %s=%s: %w", whatIs, query, err)
 	}
+	
+	// Convertir query a mayúsculas para búsqueda case-insensitive
+	queryUpper := strings.ToUpper(query)
+	
 	// Preallocar slice para mejor performance
 	filteredFeatures := make([]types.GeoFeature, 0, len(geo.Features)/10) // Estimación conservadora
 	for _, feat := range geo.Features {
@@ -39,7 +44,8 @@ func GetMunicipios(staticCache interfaces.StaticCacheService, query, whatIs stri
 		if !ok {
 			continue
 		}
-		if propVal == query {
+		// Búsqueda case-insensitive y parcial
+		if strings.Contains(strings.ToUpper(propVal), queryUpper) {
 			filteredFeatures = append(filteredFeatures, feat)
 		}
 	}

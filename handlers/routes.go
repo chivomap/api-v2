@@ -21,8 +21,10 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	app.Get("/geo/search-data", geoHandler.GetGeoData)
 
 	// Scraping
-	app.Get("/scrape", NewScrapeHandler(deps))
+	scrapeHandler := NewScrapeHandler(deps)
+	app.Get("/scrape", scrapeHandler.HandleScrape)
 
 	// Otras rutas
-	app.Get("/health", NewHealthHandler(deps))
+	healthHandler := NewHealthHandler(deps)
+	app.Get("/health", healthHandler.HealthCheck)
 }

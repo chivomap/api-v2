@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	
+	"github.com/joho/godotenv"
 )
 
 // Config contiene toda la configuración de la aplicación
@@ -25,6 +27,12 @@ var AppConfig Config
 
 // LoadConfig carga la configuración desde variables de entorno
 func LoadConfig() error {
+	// Cargar archivo .env si existe
+	if err := godotenv.Load(); err != nil {
+		// No es un error crítico si no existe .env
+		fmt.Printf("Advertencia: No se pudo cargar .env: %v\n", err)
+	}
+	
 	// Detectar directorio base de la aplicación
 	execPath, err := os.Executable()
 	var baseDir string
