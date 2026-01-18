@@ -10,12 +10,14 @@ import (
 
 // SismosHandler maneja los endpoints relacionados con sismos
 type SismosHandler struct {
+	deps  *Dependencies
 	cache *services.CacheService[[]scraping.Sismo]
 }
 
 // NewSismosHandler crea una nueva instancia de SismosHandler
-func NewSismosHandler() *SismosHandler {
+func NewSismosHandler(deps *Dependencies) *SismosHandler {
 	return &SismosHandler{
+		deps:  deps,
 		cache: services.NewCacheService[[]scraping.Sismo](3), // 3 minutos TTL
 	}
 }

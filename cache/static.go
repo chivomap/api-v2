@@ -2,13 +2,12 @@ package cache
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
-	"chivomap.com/config"
 	"chivomap.com/types"
 	"chivomap.com/utils"
 )
@@ -23,20 +22,13 @@ type StaticFileCache struct {
 	mu         sync.RWMutex
 }
 
-var (
-	// Instancia global del cache de archivos estáticos
-	staticCache *StaticFileCache
-	cacheOnce   sync.Once
-)
+// StaticFileCacheService implements the StaticCacheService interface
 
-// GetStaticCache retorna la instancia singleton del cache estático
-func GetStaticCache() *StaticFileCache {
-	cacheOnce.Do(func() {
-		staticCache = &StaticFileCache{
-			filePath: filepath.Join(config.AppConfig.AssetsDir, "topo.json"),
-		}
-	})
-	return staticCache
+// NewStaticFileCache creates a new static file cache
+func NewStaticFileCache(assetsDir string) *StaticFileCache {
+	return &StaticFileCache{
+		filePath: filepath.Join(assetsDir, "topo.json"),
+	}
 }
 
 // LoadTopoJSON carga el archivo TopoJSON en memoria si no está cacheado o si ha cambiado
@@ -47,7 +39,7 @@ func (s *StaticFileCache) LoadTopoJSON() (*types.TopoJSON, error) {
 	// Verificar si el archivo ha cambiado
 	fileInfo, err := os.Stat(s.filePath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error obteniendo información del archivo TopoJSON %s: %w", s.filePath, err)
 	}
 
 	// Si ya está cacheado y el archivo no ha cambiado, retornar el cache
@@ -59,16 +51,16 @@ func (s *StaticFileCache) LoadTopoJSON() (*types.TopoJSON, error) {
 	utils.Info("Cargando TopoJSON desde: %s", s.filePath)
 	file, err := os.ReadFile(s.filePath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error leyendo archivo TopoJSON %s: %w", s.filePath, err)
 	}
 
 	var topo types.TopoJSON
 	if err := json.Unmarshal(file, &topo); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error deserializando TopoJSON desde %s: %w", s.filePath, err)
 	}
 
 	if topo.Objects == nil || len(topo.Arcs) == 0 {
-		return nil, errors.New("topojson inválido: faltan objects o arcs")
+		return nil, fmt.Errorf("TopoJSON inválido en %s: faltan objects o arcs", s.filePath)
 	}
 
 	// Actualizar cache
@@ -107,7 +99,7 @@ func (s *StaticFileCache) GetGeoData() (*types.GeoFeatureCollection, error) {
 	// Convertir TopoJSON a GeoJSON
 	geo, err := s.topoToGeo(topo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error convirtiendo TopoJSON a GeoJSON: %w", err)
 	}
 
 	s.geoData = geo
@@ -119,7 +111,7 @@ func (s *StaticFileCache) GetGeoData() (*types.GeoFeatureCollection, error) {
 func (s *StaticFileCache) topoToGeo(topo *types.TopoJSON) (*types.GeoFeatureCollection, error) {
 	collection, ok := topo.Objects["collection"]
 	if !ok {
-		return nil, errors.New("la clave 'collection' no existe")
+		return nil, fmt.Errorf("TopoJSON inválido: la clave 'collection' no existe en objects")
 	}
 
 	// Preallocar slice para mejor performance
@@ -128,7 +120,8 @@ func (s *StaticFileCache) topoToGeo(topo *types.TopoJSON) (*types.GeoFeatureColl
 	for _, geom := range collection.Geometries {
 		geoGeom, err := s.convertGeometry(geom, topo)
 		if err != nil {
-			// Se omite la geometría si hay error en la conversión
+			// Log del error pero continuar con otras geometrías
+			utils.Error("Error convirtiendo geometría %s: %v", geom.Type, err)
 			continue
 		}
 		features = append(features, types.GeoFeature{
@@ -209,7 +202,7 @@ func (s *StaticFileCache) convertGeometry(geom types.Geometry, topo *types.TopoJ
 		return polys, nil
 
 	default:
-		return nil, errors.New("tipo de geometría no soportada: " + geom.Type)
+		return nil, fmt.Errorf("tipo de geometría no soportada: %s", geom.Type)
 	}
 }
 

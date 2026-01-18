@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -24,7 +24,7 @@ type Config struct {
 var AppConfig Config
 
 // LoadConfig carga la configuración desde variables de entorno
-func LoadConfig() {
+func LoadConfig() error {
 	// Detectar directorio base de la aplicación
 	execPath, err := os.Executable()
 	var baseDir string
@@ -35,24 +35,29 @@ func LoadConfig() {
 		baseDir = filepath.Dir(execPath)
 	}
 	
+	databaseURL, err := getEnv("TURSO_DATABASE_URL")
+	if err != nil {
+		return fmt.Errorf("error cargando configuración: %w", err)
+	}
+	
 	AppConfig = Config{
 		ServerPort:    getEnvOrDefault("PORT", "8080"),
-		DatabaseURL:   getEnv("TURSO_DATABASE_URL"),
+		DatabaseURL:   databaseURL,
 		DatabaseToken: getEnvOrDefault("TURSO_AUTH_TOKEN", ""), // Token opcional para SQLite local
 		BaseDir:      baseDir,
 		AssetsDir:    getEnvOrDefault("ASSETS_DIR", filepath.Join(baseDir, "utils", "assets")),
 	}
 
-	log.Printf("Configuración cargada: Puerto=%s, BaseDir=%s", AppConfig.ServerPort, AppConfig.BaseDir)
+	return nil
 }
 
 // getEnv obtiene una variable de entorno requerida
-func getEnv(key string) string {
+func getEnv(key string) (string, error) {
 	val := os.Getenv(key)
 	if val == "" {
-		log.Fatalf("❌ La variable de entorno %s es requerida", key)
+		return "", fmt.Errorf("variable de entorno requerida no encontrada: %s", key)
 	}
-	return val
+	return val, nil
 }
 
 // getEnvOrDefault obtiene una variable de entorno o devuelve un valor por defecto

@@ -3,7 +3,6 @@ package config
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 
 	_ "github.com/tursodatabase/go-libsql"
@@ -13,40 +12,45 @@ import (
 var CensoDB *sql.DB
 
 // LoadCensoConfig carga la configuración de la base de datos del censo
-func LoadCensoConfig() (string, string) {
+func LoadCensoConfig() (string, string, error) {
 	dbURL := os.Getenv("TURSO_DATABASE_URL_CENSO")
 	authToken := os.Getenv("TURSO_AUTH_TOKEN_CENSO")
 
 	if dbURL == "" || authToken == "" {
-		log.Fatal("❌ Faltan las credenciales de la base de datos del censo. Configura TURSO_DATABASE_URL_CENSO y TURSO_AUTH_TOKEN_CENSO en .env")
+		return "", "", fmt.Errorf("faltan las credenciales de la base de datos del censo: configura TURSO_DATABASE_URL_CENSO y TURSO_AUTH_TOKEN_CENSO en .env")
 	}
 
-	return dbURL, authToken
+	return dbURL, authToken, nil
 }
 
 // ConnectCensoDB establece la conexión con la base de datos del censo
-func ConnectCensoDB() {
-	dbURL, authToken := LoadCensoConfig()
+func ConnectCensoDB() error {
+	dbURL, authToken, err := LoadCensoConfig()
+	if err != nil {
+		return fmt.Errorf("error cargando configuración del censo: %w", err)
+	}
+	
 	url := fmt.Sprintf("%s?authToken=%s", dbURL, authToken)
 
-	var err error
 	CensoDB, err = sql.Open("libsql", url)
 	if err != nil {
-		log.Fatalf("❌ Error al conectar a la base de datos del censo: %v", err)
+		return fmt.Errorf("error al conectar a la base de datos del censo: %w", err)
 	}
 
 	// Verificar la conexión
 	if err = CensoDB.Ping(); err != nil {
-		log.Fatalf("❌ Error al verificar la conexión a la base de datos del censo: %v", err)
+		return fmt.Errorf("error al verificar la conexión a la base de datos del censo: %w", err)
 	}
 
-	log.Println("✅ Conectado a la base de datos del censo en Turso")
+	return nil
 }
 
 // CloseCensoDB cierra la conexión a la base de datos del censo
-func CloseCensoDB() {
+func CloseCensoDB() error {
 	if CensoDB != nil {
-		CensoDB.Close()
-		log.Println("Conexión a la base de datos del censo cerrada")
+		if err := CensoDB.Close(); err != nil {
+			return fmt.Errorf("error cerrando la conexión a la base de datos del censo: %w", err)
+		}
 	}
+	return nil
 }

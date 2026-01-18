@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"chivomap.com/config"
+	"chivomap.com/container"
 	_ "chivomap.com/docs" // Importación necesaria para Swagger
 	"chivomap.com/handlers"
+	"chivomap.com/services"
 	"chivomap.com/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -29,7 +31,9 @@ import (
 // @BasePath /
 func main() {
 	// Cargar configuración
-	config.LoadConfig()
+	if err := config.LoadConfig(); err != nil {
+		utils.Fatal("Error cargando configuración: %v", err)
+	}
 
 	// Inicializar Fiber con límites de seguridad
 	app := fiber.New(fiber.Config{
@@ -71,10 +75,29 @@ func main() {
 	}))
 
 	// Conectar a la base de datos
-	config.ConnectDB()
+	if err := config.ConnectDB(); err != nil {
+		utils.Fatal("Error conectando a la base de datos: %v", err)
+	}
+
+	// Crear contenedor de dependencias
+	configService := services.NewConfigServiceFromGlobal()
+	container, err := container.NewContainer(configService, config.DB, config.CensoDB)
+	if err != nil {
+		utils.Fatal("Error creando contenedor de dependencias: %v", err)
+	}
+	defer container.Close()
+
+	// Crear dependencias para handlers
+	deps := &handlers.Dependencies{
+		Config:      container.Config,
+		DB:          container.DB,
+		CensoDB:     container.CensoDB,
+		StaticCache: container.StaticCache,
+		Logger:      container.Logger,
+	}
 
 	// Configurar rutas
-	handlers.SetupRoutes(app)
+	handlers.SetupRoutes(app, deps)
 
 	// Configurar Swagger con tema oscuro y toggle
 	utils.SetupSwagger(app)

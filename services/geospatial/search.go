@@ -1,9 +1,9 @@
 package geospatial
 
 import (
-	"errors"
+	"fmt"
 
-	"chivomap.com/cache"
+	"chivomap.com/interfaces"
 	"chivomap.com/types"
 )
 
@@ -19,16 +19,15 @@ func mapToSlice(m map[string]struct{}) []string {
 }
 
 // GetMunicipios filtra las features por el valor exacto en la propiedad especificada ("D", "M" o "NAM").
-func GetMunicipios(query, whatIs string) (*types.GeoFeatureCollection, error) {
+func GetMunicipios(staticCache interfaces.StaticCacheService, query, whatIs string) (*types.GeoFeatureCollection, error) {
 	if whatIs != "D" && whatIs != "M" && whatIs != "NAM" {
-		return nil, errors.New("el segundo parámetro debe ser 'M', 'D' o 'NAM'")
+		return nil, fmt.Errorf("parámetro whatIs inválido '%s': debe ser 'M', 'D' o 'NAM'", whatIs)
 	}
 	
 	// Usar cache estático en lugar de leer desde disco
-	staticCache := cache.GetStaticCache()
 	geo, err := staticCache.GetGeoData()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error obteniendo datos geoespaciales para filtro %s=%s: %w", whatIs, query, err)
 	}
 	// Preallocar slice para mejor performance
 	filteredFeatures := make([]types.GeoFeature, 0, len(geo.Features)/10) // Estimación conservadora
@@ -51,12 +50,11 @@ func GetMunicipios(query, whatIs string) (*types.GeoFeatureCollection, error) {
 }
 
 // GetGeoData extrae nombres únicos de departamentos, municipios y distritos a partir del TopoJSON.
-func GetGeoData() (*types.GeoData, error) {
+func GetGeoData(staticCache interfaces.StaticCacheService) (*types.GeoData, error) {
 	// Usar cache estático en lugar de leer desde disco
-	staticCache := cache.GetStaticCache()
 	geo, err := staticCache.GetGeoData()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error obteniendo datos geoespaciales para extracción de nombres: %w", err)
 	}
 	// Preallocar maps con capacidad estimada para mejor performance
 	estimatedSize := len(geo.Features) / 50 // Estimación basada en datos de El Salvador

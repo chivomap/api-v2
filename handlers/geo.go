@@ -3,6 +3,7 @@ package handlers
 import (
 	"sync"
 	
+	"chivomap.com/interfaces"
 	"chivomap.com/services"
 	"chivomap.com/services/geospatial"
 	"chivomap.com/types"
@@ -12,14 +13,25 @@ import (
 
 // GeoHandler maneja los endpoints relacionados con datos geoespaciales
 type GeoHandler struct {
+	deps         *Dependencies
 	geoDataCache *services.CacheService[*types.GeoData]
 	municCache   *services.CacheService[map[string]*types.GeoFeatureCollection]
 	cacheMutex   sync.RWMutex // Protege operaciones de cache
 }
 
+// Dependencies holds the dependencies for handlers
+type Dependencies struct {
+	Config      interfaces.ConfigService
+	DB          interfaces.DatabaseService
+	CensoDB     interfaces.DatabaseService
+	StaticCache interfaces.StaticCacheService
+	Logger      interfaces.Logger
+}
+
 // NewGeoHandler crea una nueva instancia de GeoHandler
-func NewGeoHandler() *GeoHandler {
+func NewGeoHandler(deps *Dependencies) *GeoHandler {
 	return &GeoHandler{
+		deps:         deps,
 		geoDataCache: services.NewCacheService[*types.GeoData](60), // 1 hora
 		municCache:   services.NewCacheService[map[string]*types.GeoFeatureCollection](60),
 	}
@@ -63,7 +75,7 @@ func (h *GeoHandler) GetMunicipios(c *fiber.Ctx) error {
 	h.cacheMutex.RUnlock()
 
 	// Los valores ya están validados y en el formato correcto (D, M, NAM)
-	data, err := geospatial.GetMunicipios(validatedQuery, validatedWhatIs)
+	data, err := geospatial.GetMunicipios(h.deps.StaticCache, validatedQuery, validatedWhatIs)
 	if err != nil {
 		utils.Error("Error al obtener municipios: %v", err)
 		return utils.RespondWithError(c, fiber.StatusInternalServerError, err.Error())
@@ -98,7 +110,7 @@ func (h *GeoHandler) GetGeoData(c *fiber.Ctx) error {
 		return utils.SendResponse(c, data)
 	}
 
-	data, err := geospatial.GetGeoData()
+	data, err := geospatial.GetGeoData(h.deps.StaticCache)
 	if err != nil {
 		utils.Error("Error al obtener geo data: %v", err)
 		return utils.RespondWithError(c, fiber.StatusInternalServerError,
@@ -114,7 +126,7 @@ func (h *GeoHandler) updateGeoDataCache() {
 	h.geoDataCache.SetUpdating(true)
 	defer h.geoDataCache.SetUpdating(false)
 
-	newData, err := geospatial.GetGeoData()
+	newData, err := geospatial.GetGeoData(h.deps.StaticCache)
 	if err != nil {
 		utils.Error("Error al actualizar caché geo: %v", err)
 		return
