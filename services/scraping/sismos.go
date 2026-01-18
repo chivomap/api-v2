@@ -1,124 +1,168 @@
 package scraping
 
 import (
+	"bufio"
+	"bytes"
+	"encoding/json"
 	"fmt"
-	"os"
+	"io"
+	"net/http"
+	"strings"
 	"time"
-
-	"github.com/playwright-community/playwright-go"
 )
 
 // Estructura para almacenar los datos del sismo
 type Sismo struct {
-	Fecha        string `json:"fecha"`
-	Fases        string `json:"fases"`
-	Latitud      string `json:"latitud"`
-	Longitud     string `json:"longitud"`
-	Profundidad  string `json:"profundidad"`
-	Magnitud     string `json:"magnitud"`
-	Localizacion string `json:"localizacion"`
-	RMS          string `json:"rms"`
-	Estado       string `json:"estado"`
+	Fecha        string  `json:"fecha"`
+	Fases        int     `json:"fases"`
+	Latitud      float64 `json:"latitud"`
+	Longitud     float64 `json:"longitud"`
+	Profundidad  float64 `json:"profundidad"`
+	Magnitud     float64 `json:"magnitud"`
+	Localizacion string  `json:"localizacion"`
+	RMS          float64 `json:"rms"`
+	Estado       string  `json:"estado"`
 }
 
-// Función para scrapear los sismos
+type eventoSignalR struct {
+	GMTOT       string  `json:"gmtot"`
+	Fases       int     `json:"fases"`
+	Latitud     float64 `json:"latitud"`
+	Longitud    float64 `json:"longitud"`
+	Profundidad float64 `json:"profundidad"`
+	M           float64 `json:"m"`
+	Region      string  `json:"region"`
+	RMS         float64 `json:"rms"`
+	Estado      string  `json:"estado"`
+}
+
+type negotiateResponse struct {
+	ConnectionID        string `json:"connectionId"`
+	AvailableTransports []struct {
+		Transport       string   `json:"transport"`
+		TransferFormats []string `json:"transferFormats"`
+	} `json:"availableTransports"`
+}
+
+type signalRMessage struct {
+	Type      int               `json:"type"`
+	Target    string            `json:"target"`
+	Arguments []json.RawMessage `json:"arguments"`
+}
+
 func ScrapeSismos() ([]Sismo, error) {
-	pw, err := playwright.Run()
+	client := &http.Client{Timeout: 30 * time.Second}
+
+	// 1. Negociar conexión
+	negResp, err := client.Post("https://srt.snet.gob.sv/rtsismos/seiscomphub/negotiate", "application/json", nil)
 	if err != nil {
-		return nil, fmt.Errorf("error al iniciar Playwright: %w", err)
+		return nil, fmt.Errorf("error negociando: %w", err)
 	}
-	defer pw.Stop()
+	defer negResp.Body.Close()
 
-	// Lanzar navegador
-	// Usar headless mode basado en variable de entorno (por defecto true para producción)
-	headless := os.Getenv("BROWSER_HEADLESS") != "false"
-	browser, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
-		Headless: playwright.Bool(headless),
-		Timeout:  playwright.Float(60000),
-	})
+	var negotiate negotiateResponse
+	if err := json.NewDecoder(negResp.Body).Decode(&negotiate); err != nil {
+		return nil, fmt.Errorf("error decodificando negociación: %w", err)
+	}
+
+	connID := negotiate.ConnectionID
+
+	// 2. Conectar a SSE
+	sseURL := fmt.Sprintf("https://srt.snet.gob.sv/rtsismos/seiscomphub?id=%s", connID)
+	req, _ := http.NewRequest("GET", sseURL, nil)
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Cache-Control", "no-cache")
+
+	sseResp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error al lanzar navegador: %w", err)
+		return nil, fmt.Errorf("error conectando SSE: %w", err)
 	}
-	defer browser.Close()
+	defer sseResp.Body.Close()
 
-	// Crear contexto con user-agent
-	context, err := browser.NewContext(playwright.BrowserNewContextOptions{
-		UserAgent: playwright.String("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error al crear contexto del navegador: %w", err)
+	// 3. Enviar invoke SendEvento en goroutine
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		invokeURL := fmt.Sprintf("https://srt.snet.gob.sv/rtsismos/seiscomphub?id=%s", connID)
+		payload := `{"arguments":[],"target":"SendEvento","type":1}` + "\x1E"
+		resp, err := http.Post(invokeURL, "text/plain;charset=UTF-8", bytes.NewBufferString(payload))
+		if err != nil {
+			fmt.Printf("Error invocando: %v\n", err)
+		} else {
+			resp.Body.Close()
+			fmt.Printf("Invoke enviado correctamente\n")
+		}
+	}()
+
+	// 4. Leer eventos SSE
+	reader := bufio.NewReader(sseResp.Body)
+	timeout := time.After(20 * time.Second)
+	lineCount := 0
+
+	for {
+		select {
+		case <-timeout:
+			return nil, fmt.Errorf("timeout esperando eventos (leídas %d líneas)", lineCount)
+		default:
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				if err == io.EOF {
+					return nil, fmt.Errorf("conexión cerrada después de %d líneas", lineCount)
+				}
+				return nil, fmt.Errorf("error leyendo: %w", err)
+			}
+
+			lineCount++
+			line = strings.TrimSpace(line)
+			
+			if line == "" || line == ":" {
+				continue
+			}
+
+			fmt.Printf("SSE[%d]: %s\n", lineCount, line)
+
+			if !strings.HasPrefix(line, "data: ") {
+				continue
+			}
+
+			data := strings.TrimPrefix(line, "data: ")
+			if data == "" || data == "{}" {
+				continue
+			}
+
+			// Parsear mensaje SignalR
+			var msg signalRMessage
+			if err := json.Unmarshal([]byte(data), &msg); err != nil {
+				fmt.Printf("Error parseando mensaje: %v\n", err)
+				continue
+			}
+
+			fmt.Printf("Mensaje tipo %d, target: %s\n", msg.Type, msg.Target)
+
+			// Buscar EventSignal
+			if msg.Target == "EventSignal" && len(msg.Arguments) > 0 {
+				var eventos []eventoSignalR
+				if err := json.Unmarshal(msg.Arguments[0], &eventos); err != nil {
+					continue
+				}
+
+				// Convertir a Sismo
+				result := make([]Sismo, 0, len(eventos))
+				for _, evt := range eventos {
+					t, _ := time.Parse(time.RFC3339, evt.GMTOT+"Z")
+					result = append(result, Sismo{
+						Fecha:        t.Format("2/1/2006, 3:04:05 p. m."),
+						Fases:        evt.Fases,
+						Latitud:      evt.Latitud,
+						Longitud:     evt.Longitud,
+						Profundidad:  evt.Profundidad,
+						Magnitud:     evt.M,
+						Localizacion: "Localizado " + evt.Region,
+						RMS:          evt.RMS,
+						Estado:       evt.Estado,
+					})
+				}
+				return result, nil
+			}
+		}
 	}
-
-	// Abrir nueva página
-	page, err := context.NewPage()
-	if err != nil {
-		return nil, fmt.Errorf("error al abrir página: %w", err)
-	}
-	defer page.Close()
-
-	// Configurar timeout de navegación
-	page.SetDefaultTimeout(60000)
-	page.SetDefaultNavigationTimeout(60000)
-
-	// Navegar a la página
-	_, err = page.Goto("https://srt.snet.gob.sv/rtsismos", playwright.PageGotoOptions{
-		WaitUntil: playwright.WaitUntilStateDomcontentloaded,
-		Timeout:   playwright.Float(60000),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error al navegar a la página de sismos: %w", err)
-	}
-
-	// Esperar a que la tabla aparezca
-	_, err = page.WaitForSelector("#tblEventos", playwright.PageWaitForSelectorOptions{
-		State:   playwright.WaitForSelectorStateAttached,
-		Timeout: playwright.Float(60000),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error al esperar la tabla de sismos: %w", err)
-	}
-
-	// Esperar un poco más para asegurar que los datos se carguen
-	time.Sleep(5 * time.Second)
-
-	// Extraer los datos de la tabla
-	sismos, err := page.Evaluate(`() => {
-		const rows = document.querySelectorAll("#tblEventos tbody tr:not(:first-child)");
-		return Array.from(rows).map(row => {
-			const cells = row.querySelectorAll("td");
-			return {
-				fecha: cells[0]?.textContent?.trim() || "",
-				fases: cells[1]?.textContent?.trim() || "",
-				latitud: cells[2]?.textContent?.trim() || "",
-				longitud: cells[3]?.textContent?.trim() || "",
-				profundidad: cells[4]?.textContent?.trim() || "",
-				magnitud: cells[5]?.textContent?.trim() || "",
-				localizacion: cells[6]?.textContent?.trim() || "",
-				rms: cells[7]?.textContent?.trim() || "",
-				estado: cells[8]?.textContent?.trim() || ""
-			};
-		});
-	}`)
-	if err != nil {
-		return nil, fmt.Errorf("error al extraer datos de la tabla: %w", err)
-	}
-
-	// Convertir los datos a una estructura de Go
-	var result []Sismo
-	for _, row := range sismos.([]interface{}) {
-		data := row.(map[string]interface{})
-		result = append(result, Sismo{
-			Fecha:        fmt.Sprintf("%v", data["fecha"]),
-			Fases:        fmt.Sprintf("%v", data["fases"]),
-			Latitud:      fmt.Sprintf("%v", data["latitud"]),
-			Longitud:     fmt.Sprintf("%v", data["longitud"]),
-			Profundidad:  fmt.Sprintf("%v", data["profundidad"]),
-			Magnitud:     fmt.Sprintf("%v", data["magnitud"]),
-			Localizacion: fmt.Sprintf("%v", data["localizacion"]),
-			RMS:          fmt.Sprintf("%v", data["rms"]),
-			Estado:       fmt.Sprintf("%v", data["estado"]),
-		})
-	}
-
-	return result, nil
 }

@@ -12,6 +12,9 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
+# Instalar Playwright y navegadores
+RUN go run github.com/playwright-community/playwright-go/cmd/playwright@latest install --with-deps chromium
+
 # Copiamos el resto del código fuente y el directorio de assets
 COPY . .
 COPY utils/assets /app/utils/assets
@@ -22,8 +25,24 @@ RUN go build -o out .
 # Etapa final: se usa una imagen runtime con glibc actualizada (Debian Bookworm)
 FROM --platform=linux/amd64 debian:bookworm-slim
 
-# Instalamos certificados y otras librerías necesarias
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+# Instalamos certificados y dependencias de Chromium
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libdbus-1-3 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -32,6 +51,9 @@ COPY --from=builder /app/out .
 
 # Copiamos el directorio de assets desde la etapa builder
 COPY --from=builder /app/utils/assets /app/utils/assets
+
+# Copiamos los navegadores de Playwright
+COPY --from=builder /root/.cache/ms-playwright /root/.cache/ms-playwright
 
 # Exponemos el puerto (modifica si tu app usa otro)
 EXPOSE 8080
